@@ -13,19 +13,19 @@ RegisterNetEvent('SonoranCMS::Plugins::GiveInfo', function(pluginName, payload)
 	end
 end)
 
-function errorLog(message)
+local function errorLog(message)
 	return print('^1[ERROR - Sonoran CMS Ace Perms - ' .. os.date('%c') .. ' ' .. message .. '^0');
 end
 
-function infoLog(message)
+local function infoLog(message)
 	return print('[INFO - Sonoran CMS Ace Perms - ' .. os.date('%c') .. ' ' .. message .. '^0');
 end
 
-function wait(seconds)
+local function wait(seconds)
 	os.execute('sleep ' .. tonumber(seconds))
 end
 
-function getPlayerFromID(apiId)
+local function getPlayerFromID(apiId)
 	local players = GetPlayers()
 	for _, v in ipairs(players) do
 		local player = tonumber(v)
@@ -41,16 +41,29 @@ function getPlayerFromID(apiId)
 	end
 end
 
+local function getPlayerapiID(source)
+	local identifier = nil
+	for _, g in pairs(GetPlayerIdentifiers(source)) do
+		if string.sub(g, 1, string.len(apiIdType .. ':')) == apiIdType .. ':' then
+			identifier = string.sub(g, string.len(apiIdType .. ':') + 1)
+			if identifier ~= nil then
+				return identifier
+			end
+		end
+	end
+end
+
 function initialize()
 	if GetResourceState('sonorancms') ~= 'started' then
 		errorLog('SonoranCMS Core Is Not Started! Not loading addon...')
 	else
-		cache = json.decode(LoadResourceFile(GetCurrentResourceName(), 'cache.json'))
-		TriggerEvent('sonorancms::RegisterPushEvent', 'ACCOUNT_UPDATED', 'sonoran_permissions::rankupdate')
 		infoLog('Checking resource version...');
 		TriggerEvent('SonoranCMS::Plugins::Loaded', GetCurrentResourceName())
 		wait(2)
-		RegisterNetEvent('sonoran_permissions::rankupdate', function(data)
+		cache = json.decode(LoadResourceFile(GetCurrentResourceName(), 'cache.json'))
+		TriggerEvent('sonorancms::RegisterPushEvent', 'ACCOUNT_UPDATED', 'sonoran_jobsync::rankupdate')
+		RegisterNetEvent('sonoran_jobsync::rankupdate', function(data)
+			print(json.encode(data))
 			local ppermissiondata = data.data.primaryRank
 			local ppermissiondatas = data.data.secondaryRanks
 			local identifier = data.data.activeApiIds
@@ -69,8 +82,13 @@ function initialize()
 							end
 							if not has then
 								loaded_list[g][k] = nil
-								local playerSource = getPlayerFromID(b)
-								ExecuteCommand('setjob ' .. playerSource .. ' unemployed 0')
+								local playerSource = getPlayerFromID(g)
+								if playerSource ~= nil then
+									if debugMode then
+										infoLog('Push event recieved, executing the following command: ' .. 'setjob ' .. playerSource .. ' unemployed 0')
+									end
+									ExecuteCommand('setjob ' .. playerSource .. ' unemployed 0')
+								end
 								if Config.offline_cache then
 									cache[g][k] = nil
 									SaveResourceFile(GetCurrentResourceName(), 'cache.json', json.encode(cache))
@@ -83,18 +101,24 @@ function initialize()
 					if Config.rank_mapping[ppermissiondata] ~= nil then
 						for _, b in pairs(identifier) do
 							local playerSource = getPlayerFromID(b)
-							ExecuteCommand('setjob ' .. playerSource .. ' ' .. Config.rank_mapping[ppermissiondata].job .. ' ' .. Config.rank_mapping[ppermissiondata].rank)
-							if loaded_list[b] == nil then
-								loaded_list[b] = {[ppermissiondata] = {job = Config.rank_mapping[ppermissiondata].job, rank = Config.rank_mapping[ppermissiondata].rank}}
-							else
-								loaded_list[b][ppermissiondata] = {job = Config.rank_mapping[ppermissiondata].job, rank = Config.rank_mapping[ppermissiondata].rank}
+							if playerSource ~= nil then
+								if debugMode then
+									infoLog('Push event recieved, executing the following command: ' .. 'setjob ' .. playerSource .. ' ' .. Config.rank_mapping[ppermissiondata].job .. ' '
+													        .. Config.rank_mapping[ppermissiondata].rank)
+								end
+								ExecuteCommand('setjob ' .. playerSource .. ' ' .. Config.rank_mapping[ppermissiondata].job .. ' ' .. Config.rank_mapping[ppermissiondata].rank)
+								if loaded_list[b] == nil then
+									loaded_list[b] = {[ppermissiondata] = {job = Config.rank_mapping[ppermissiondata].job, rank = Config.rank_mapping[ppermissiondata].rank}}
+								else
+									loaded_list[b][ppermissiondata] = {job = Config.rank_mapping[ppermissiondata].job, rank = Config.rank_mapping[ppermissiondata].rank}
+								end
 							end
 							if Config.offline_cache then
 								if cache[b] == nil then
-									cache[b] = {[ppermissiondata] = 'setjob ' .. playerSource .. ' ' .. Config.rank_mapping[ppermissiondata].job .. ' ' .. Config.rank_mapping[ppermissiondata].rank}
+									cache[b] = {[ppermissiondata] = {apiID = b, jobData = Config.rank_mapping[ppermissiondata]}}
 									SaveResourceFile(GetCurrentResourceName(), 'cache.json', json.encode(cache))
 								else
-									cache[b][ppermissiondata] = 'setjob ' .. playerSource .. ' ' .. Config.rank_mapping[ppermissiondata].job .. ' ' .. Config.rank_mapping[ppermissiondata].rank
+									cache[b][ppermissiondata] = {identifier = b, jobData = Config.rank_mapping[ppermissiondata]}
 									SaveResourceFile(GetCurrentResourceName(), 'cache.json', json.encode(cache))
 								end
 							end
@@ -106,18 +130,23 @@ function initialize()
 						if Config.rank_mapping[v] ~= nil then
 							for _, b in pairs(identifier) do
 								local playerSource = getPlayerFromID(b)
-								ExecuteCommand('setjob ' .. playerSource .. ' ' .. Config.rank_mapping[v].job .. ' ' .. Config.rank_mapping[v].rank)
-								if loaded_list[b] == nil then
-									loaded_list[b] = {[v] = {job = Config.rank_mapping[v].job, rank = Config.rank_mapping[v].rank}}
-								else
-									loaded_list[b][v] = Config.rank_mapping[v]
+								if playerSource ~= nil then
+									if debugMode then
+										infoLog('Push event recieved, executing the following command: ' .. 'setjob ' .. playerSource .. ' ' .. Config.rank_mapping[v].job .. ' ' .. Config.rank_mapping[v].rank)
+									end
+									ExecuteCommand('setjob ' .. playerSource .. ' ' .. Config.rank_mapping[v].job .. ' ' .. Config.rank_mapping[v].rank)
+									if loaded_list[b] == nil then
+										loaded_list[b] = {[v] = {job = Config.rank_mapping[v].job, rank = Config.rank_mapping[v].rank}}
+									else
+										loaded_list[b][v] = Config.rank_mapping[v]
+									end
 								end
 								if Config.offline_cache then
 									if cache[b] == nil then
-										cache[b] = {[v] = 'setjob ' .. playerSource .. ' ' .. Config.rank_mapping[v].job .. ' ' .. Config.rank_mapping[v].rank}
+										cache[b] = {[v] = {apiID = b, jobData = Config.rank_mapping[v]}}
 										SaveResourceFile(GetCurrentResourceName(), 'cache.json', json.encode(cache))
 									else
-										cache[b][v] = 'setjob ' .. playerSource .. ' ' .. Config.rank_mapping[v].job .. ' ' .. Config.rank_mapping[v].rank
+										cache[b][v] = {apiID = b, jobData = Config.rank_mapping[v]}
 										SaveResourceFile(GetCurrentResourceName(), 'cache.json', json.encode(cache))
 									end
 								end
@@ -150,6 +179,9 @@ function initialize()
 							end
 							if not has then
 								loaded_list[identifier][k] = nil
+								if debugMode then
+									infoLog('Push event recieved, executing the following command: ' .. 'setjob ' .. source .. ' unemployed 0')
+								end
 								ExecuteCommand('setjob ' .. source .. ' unemployed 0')
 								if Config.offline_cache then
 									cache[identifier][k] = nil
@@ -160,6 +192,9 @@ function initialize()
 					end
 					for _, v in pairs(ppermissiondata) do
 						if Config.rank_mapping[v] ~= nil then
+							if debugMode then
+								infoLog('Push event recieved, executing the following command: ' .. 'setjob ' .. source .. ' ' .. Config.rank_mapping[v].job .. ' ' .. Config.rank_mapping[v].rank)
+							end
 							ExecuteCommand('setjob ' .. source .. ' ' .. Config.rank_mapping[v].job .. ' ' .. Config.rank_mapping[v].rank)
 							if loaded_list[identifier] == nil then
 								loaded_list[identifier] = {[v] = {job = Config.rank_mapping[v].job, rank = Config.rank_mapping[v].rank}}
@@ -167,12 +202,15 @@ function initialize()
 								loaded_list[identifier][v] = {job = Config.rank_mapping[v].job, rank = Config.rank_mapping[v].rank}
 							end
 							if Config.offline_cache then
-								if cache[identifier] == nil then
-									cache[identifier] = {[v] = 'setjob ' .. source .. ' ' .. Config.rank_mapping[v].job .. ' ' .. Config.rank_mapping[v].rank}
-									SaveResourceFile(GetCurrentResourceName(), 'cache.json', json.encode(cache))
-								else
-									cache[identifier][v] = 'setjob ' .. source .. ' ' .. Config.rank_mapping[v].job .. ' ' .. Config.rank_mapping[v].rank
-									SaveResourceFile(GetCurrentResourceName(), 'cache.json', json.encode(cache))
+								local playerApiID = getPlayerapiID(source)
+								if playerApiID ~= nil then
+									if cache[identifier] == nil then
+										cache[identifier] = {[v] = {apiID = playerApiID, jobData = Config.rank_mapping[v]}}
+										SaveResourceFile(GetCurrentResourceName(), 'cache.json', json.encode(cache))
+									else
+										cache[identifier][v] = {apiID = playerApiID, jobData = Config.rank_mapping[v]}
+										SaveResourceFile(GetCurrentResourceName(), 'cache.json', json.encode(cache))
+									end
 								end
 							end
 						end
@@ -182,6 +220,9 @@ function initialize()
 					if cache[identifier] ~= nil then
 						for _, v in pairs(cache[identifier]) do
 							if string.sub(v, 1, string.len('')) == 'setjob' then
+								if debugMode then
+									infoLog('Push event recieved, executing the following command: ' .. v)
+								end
 								ExecuteCommand(v)
 								if loaded_list[identifier] == nil then
 									loaded_list[identifier] = {[v] = {job = Config.rank_mapping[v].job, rank = Config.rank_mapping[v].rank}}
@@ -221,6 +262,9 @@ function initialize()
 							end
 							if not has then
 								loaded_list[identifier][k] = nil
+								if debugMode then
+									infoLog('Push event recieved, executing the following command: ' .. 'setjob ' .. source .. ' unemployed 0')
+								end
 								ExecuteCommand('setjob ' .. source .. ' unemployed 0')
 								if Config.offline_cache then
 									cache[identifier][k] = nil
@@ -231,6 +275,9 @@ function initialize()
 					end
 					for _, v in pairs(ppermissiondata) do
 						if Config.rank_mapping[v] ~= nil then
+							if debugMode then
+								infoLog('Push event recieved, executing the following command: ' .. 'setjob ' .. src .. ' ' .. Config.rank_mapping[v].job .. ' ' .. Config.rank_mapping[v].rank)
+							end
 							ExecuteCommand('setjob ' .. src .. ' ' .. Config.rank_mapping[v].job .. ' ' .. Config.rank_mapping[v].rank)
 							if loaded_list[identifier] == nil then
 								loaded_list[identifier] = {[v] = {job = Config.rank_mapping[v].job, rank = Config.rank_mapping[v].rank}}
@@ -238,12 +285,15 @@ function initialize()
 								loaded_list[identifier][v] = {job = Config.rank_mapping[v].job, rank = Config.rank_mapping[v].rank}
 							end
 							if Config.offline_cache then
-								if cache[identifier] == nil then
-									cache[identifier] = {[v] = 'setjob ' .. source .. ' ' .. Config.rank_mapping[v].job .. ' ' .. Config.rank_mapping[v].rank}
-									SaveResourceFile(GetCurrentResourceName(), 'cache.json', json.encode(cache))
-								else
-									cache[identifier][v] = 'setjob ' .. source .. ' ' .. Config.rank_mapping[v].job .. ' ' .. Config.rank_mapping[v].rank
-									SaveResourceFile(GetCurrentResourceName(), 'cache.json', json.encode(cache))
+								local playerApiID = getPlayerapiID(source)
+								if playerApiID ~= nil then
+									if cache[identifier] == nil then
+										cache[identifier] = {[v] = {apiID = playerApiID, jobData = Config.rank_mapping[v]}}
+										SaveResourceFile(GetCurrentResourceName(), 'cache.json', json.encode(cache))
+									else
+										cache[identifier][v] = {apiID = playerApiID, jobData = Config.rank_mapping[v]}
+										SaveResourceFile(GetCurrentResourceName(), 'cache.json', json.encode(cache))
+									end
 								end
 							end
 						end
@@ -252,11 +302,20 @@ function initialize()
 					if cache[identifier] ~= nil then
 						for _, v in pairs(cache[identifier]) do
 							if string.sub(v, 1, string.len('')) == 'setjob' then
-								ExecuteCommand(v)
-								if loaded_list[identifier] == nil then
-									loaded_list[identifier] = {[v] = {job = Config.rank_mapping[v].job, rank = Config.rank_mapping[v].rank}}
-								else
-									loaded_list[identifier][v] = {job = Config.rank_mapping[v].job, rank = Config.rank_mapping[v].rank}
+								if debugMode then
+									infoLog('Push event recieved, executing the following command: ' .. v)
+								end
+								local playerSource = getPlayerFromID(v.apiId)
+								if playerSource ~= nil then
+									if debugMode then
+										infoLog('Push event recieved, executing the following command: ' .. 'setjob ' .. playerSource .. ' ' .. Config.rank_mapping[v].job .. ' ' .. Config.rank_mapping[v].rank)
+									end
+									ExecuteCommand('setjob ' .. playerSource .. ' ' .. v.jobData.job .. ' ' .. v.jobData.rank)
+									if loaded_list[identifier] == nil then
+										loaded_list[identifier] = {[v] = {job = Config.rank_mapping[v].job, rank = Config.rank_mapping[v].rank}}
+									else
+										loaded_list[identifier][v] = {job = Config.rank_mapping[v].job, rank = Config.rank_mapping[v].rank}
+									end
 								end
 							end
 						end
