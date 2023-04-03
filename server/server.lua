@@ -63,7 +63,6 @@ function initialize()
 		cache = json.decode(LoadResourceFile(GetCurrentResourceName(), 'cache.json'))
 		TriggerEvent('sonorancms::RegisterPushEvent', 'ACCOUNT_UPDATED', 'sonoran_jobsync::rankupdate')
 		RegisterNetEvent('sonoran_jobsync::rankupdate', function(data)
-			print(json.encode(data))
 			local ppermissiondata = data.data.primaryRank
 			local ppermissiondatas = data.data.secondaryRanks
 			local identifier = data.data.activeApiIds
@@ -166,9 +165,9 @@ function initialize()
 					identifier = string.sub(v, string.len(apiIdType .. ':') + 1)
 				end
 			end
-			PerformHttpRequest(apiUrl .. '/general/get_account_ranks', function(code, result, _)
-				if code == 201 then
-					local ppermissiondata = json.decode(result)
+			exports['sonorancms']:performApiRequest({{['apiId'] = identifier}}, 'GET_ACCOUNT_RANKS', function(res)
+				if #res > 2 then
+					local ppermissiondata = json.decode(res)
 					if loaded_list[identifier] ~= nil then
 						for k, v in pairs(loaded_list[identifier]) do
 							local has = false
@@ -249,9 +248,9 @@ function initialize()
 			payload['key'] = apiKey
 			payload['type'] = 'GET_ACCOUNT_RANKS'
 			payload['data'] = {{['apiId'] = identifier}}
-			PerformHttpRequest(apiUrl .. '/general/get_account_ranks', function(code, result, _)
-				if code == 201 then
-					local ppermissiondata = json.decode(result)
+			exports['sonorancms']:performApiRequest({{['apiId'] = identifier}}, 'GET_ACCOUNT_RANKS', function(res)
+				if #res > 2 then
+					local ppermissiondata = json.decode(res)
 					if loaded_list[identifier] ~= nil then
 						for k, v in pairs(loaded_list[identifier]) do
 							local has = false
