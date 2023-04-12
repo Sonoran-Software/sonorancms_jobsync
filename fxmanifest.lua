@@ -5,7 +5,7 @@ author 'Sonoran Software Systems'
 real_name 'Sonoran CMS QB-Core Job Sync'
 description 'Sonoran CMS to QB-Core Job Sync'
 version '1.1.0'
-git_repo 'https://github.com/Jordan2139/sonorancms_jobsync'
+git_repo 'https://github.com/sonoran-software/sonorancms_jobsync'
 
 lua54 'yes'
 
