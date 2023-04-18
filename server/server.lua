@@ -327,10 +327,8 @@ end
 
 initialize();
 
-AddEventHandler('onServerResourceStart', function(resourceName)
-	if resourceName == 'sonorancms' then
-		infoLog('sonorancms core has been (re)started! reinitializing addon!')
-		initialize()
-	end
+AddEventHandler('SonoranCMS::Started', function(resourceName)
+	infoLog('sonorancms core has been (re)started! reinitializing addon!')
+	initialize()
 end)
 
